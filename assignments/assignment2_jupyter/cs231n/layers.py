@@ -31,9 +31,9 @@ def affine_forward(x, w, b):
     # W: [120 x 3]
     # b: [3,]
     
-#     print(x.reshape(x.shape[0], -1).shape)
-#     print(w.shape)
-#     print(b.shape)
+#     print("X: ", x.reshape(x.shape[0], -1).shape)
+#     print("w: ", w.shape)
+#     print("b: ", b.shape)
     
     x = x.reshape(x.shape[0], -1)
     out = x.dot(w) +b    
@@ -196,8 +196,11 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     momentum = bn_param.get("momentum", 0.9)
 
     N, D = x.shape
+#     print("D: ", D)
     running_mean = bn_param.get("running_mean", np.zeros(D, dtype=x.dtype))
     running_var = bn_param.get("running_var", np.zeros(D, dtype=x.dtype))
+#     print("running_mean: ", running_mean.shape)
+#     print("running_var: ", running_var.shape)
 
     out, cache = None, None
     if mode == "train":
@@ -223,18 +226,34 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # might prove to be helpful.                                          #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        X = x
-        sample_mean = (1/N)*np.sum(X, axis=0)
-        sample_var = (1/N)*np.sum((X-sample_mean)**2, axis=0)
-#         print(sample_mean, sample_var)
+#         X = x
+#         sample_mean = (1/N)*np.sum(X, axis=0)
+#         sample_var = (1/N)*np.sum((X-sample_mean)**2, axis=0)
         
-        x_hat = (X-sample_mean)/(np.sqrt(sample_var+eps))
-        out = gamma*x_hat+beta
+#         x_hat = (X-sample_mean)/(np.sqrt(sample_var+eps))
+#         out = gamma*x_hat+beta
         
-        running_mean = momentum * running_mean + (1 - momentum) * sample_mean
-        running_var = momentum * running_var + (1 - momentum) * sample_var
+#         print("sample_mean: ", sample_mean.shape)
+#         print("sample_var: ", sample_var.shape)       
+#         print("running_mean: ", running_mean.shape)
+#         print("running_var: ", running_var.shape)
+#         running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+#         running_var = momentum * running_var + (1 - momentum) * sample_var
         
-        cache = (x, x_hat, sample_mean, sample_var, gamma, beta, eps)
+#         cache = (x, x_hat, sample_mean, sample_var, gamma, beta, eps)
+
+        mu = x.mean(axis=0)
+        var = x.var(axis=0) + eps
+        std = np.sqrt(var)
+        z = (x - mu)/std
+        out = gamma * z + beta
+        layernorm = bn_param.get('layernorm', 0)
+        if layernorm == 0:
+           # running weighted average
+           running_mean = momentum * running_mean + (1 - momentum) * mu
+           running_var = momentum * running_var + (1 - momentum) * (std**2)
+        # save values for backward call
+        cache={'x':x,'mean':mu,'std':std,'gamma':gamma,'z':z,'var':var,'axis':layernorm}
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -249,12 +268,23 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Store the result in the out variable.                               #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-        X = x
+#         X = x
         
-        x_hat = (X-running_mean)/(np.sqrt(running_var+eps))
-        out = gamma*x_hat+beta
+#         print("Running Mean: ", running_mean.shape)
+#         print("Running Var: ", running_var.shape)
+#         print("X: ", X.shape)
         
-        cache = (x, x_hat, running_mean, running_var, gamma, beta, eps)
+#         x_hat = (X-running_mean)/(np.sqrt(running_var+eps))
+#         print("X hat: ", x_hat.shape)
+#         print("Gamma: ", gamma.shape)
+#         print("Beta: ", beta.shape)
+        
+#         out = gamma*x_hat+beta
+#         print("out: ", out.shape)
+        
+#         cache = (x, x_hat, running_mean, running_var, gamma, beta, eps)
+
+        out = gamma * (x - running_mean) / np.sqrt(running_var + eps) + beta
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -296,22 +326,38 @@ def batchnorm_backward(dout, cache):
     # might prove to be helpful.                                              #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-    x, x_hat, mu, var, gamma, beta, eps = cache[0], cache[1], cache[2], cache[3], cache[4], cache[5], cache[6]
-    N = x.shape[0]
-#     print(N)
+#     x, x_hat, mu, var, gamma, beta, eps = cache[0], cache[1], cache[2], cache[3], cache[4], cache[5], cache[6]
+#     N = x.shape[0]
+# #     print(N)
     
-#     print("dout:, ", dout)
-    dbeta = np.sum(dout, axis=0)
-    dgamma = np.sum(x_hat * dout, axis=0)
-    dx = (1/N)*(gamma/np.sqrt(var+eps)) * \
-                ( N * dout - \
-                 np.sum(dout, axis=0) - \
-                 (x - mu) / (var + eps) * \
-                  np.sum(dout * (x - mu), axis=0) ) 
+# #     print("dout:, ", dout)
+#     dbeta = np.sum(dout, axis=0)
+#     dgamma = np.sum(x_hat * dout, axis=0)
+#     dx = (1/N)*(gamma/np.sqrt(var+eps)) * \
+#                 ( N * dout - \
+#                  np.sum(dout, axis=0) - \
+#                  (x - mu) / (var + eps) * \
+#                   np.sum(dout * (x - mu), axis=0) ) 
     
-#     print("dbeta: ", dbeta)
-#     print("dgamma: ", dgamma)
-#     print("dx: ", dx)
+# #     print("dbeta: ", dbeta)
+# #     print("dgamma: ", dgamma)
+# #     print("dx: ", dx)
+
+    dbeta = dout.sum(axis=cache['axis'])
+    dgamma = np.sum(dout * cache['z'], axis=cache['axis'])
+
+    N = 1.0 * dout.shape[0]
+    dfdz = dout * cache['gamma']                                    #[NxD]
+    dudx = 1/N                                                      #[NxD]
+    dvdx = 2/N * (cache['x'] - cache['mean'])                       #[NxD] 
+    dzdx = 1 / cache['std']                                         #[NxD]
+    dzdu = -1 / cache['std']                                        #[1xD]
+    dzdv = -0.5*(cache['var']**-1.5)*(cache['x']-cache['mean'])     #[NxD]
+    dvdu = -2/N * np.sum(cache['x'] - cache['mean'], axis=0)        #[1xD]
+
+    dx = dfdz*dzdx + np.sum(dfdz*dzdu,axis=0)*dudx + \
+         np.sum(dfdz*dzdv,axis=0)*(dvdx+dvdu*dudx)
+
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -346,7 +392,7 @@ def batchnorm_backward_alt(dout, cache):
     # single statement; our implementation fits on a single 80-character line.#
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -392,7 +438,21 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # the batch norm code and leave it almost unchanged?                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+#     mu = x.mean(axis=1).T
+#     var = x.var(axis=1).T + eps
+#     std = np.sqrt(var)
+#     z = (x.T - mu)/std
+#     out = gamma * z.T + beta
+#     # save values for backward call
+#     cache={'x':x,'mean':mu,'std':std,'gamma':gamma,'z':z,'var':var}
 
+    ln_param['mode'] = 'train' # same as batch norm in train mode
+    ln_param['layernorm'] = 1
+    # transpose x, gamma and beta
+    out, cache = batchnorm_forward(x.T, gamma.reshape(-1,1),
+                                   beta.reshape(-1,1), ln_param)
+    # transpose output to get original dims
+    out = out.T
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -427,7 +487,10 @@ def layernorm_backward(dout, cache):
     # still apply!                                                            #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    # transpose dout
+    dx, dgamma, dbeta = batchnorm_backward(dout.T, cache)
+    # transpose output to get original dims
+    dx, dgamma, dbeta = dx.T, dgamma, dbeta
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -476,6 +539,8 @@ def dropout_forward(x, dropout_param):
         # Store the dropout mask in the mask variable.                        #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+        mask = (np.random.rand(*x.shape) < p) / p
+        out = x*mask # drop!
 
         pass
 
@@ -488,7 +553,7 @@ def dropout_forward(x, dropout_param):
         # TODO: Implement the test phase forward pass for inverted dropout.   #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        out = x
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -519,7 +584,7 @@ def dropout_backward(dout, cache):
         # TODO: Implement training phase backward pass for inverted dropout   #
         #######################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        dx = dout*mask
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

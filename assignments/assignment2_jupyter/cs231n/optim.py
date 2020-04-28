@@ -163,12 +163,25 @@ def adam(w, dw, config=None):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     
-    config["t"] += 1 # 1 to inf
-    config["m"] = config["beta1"]*config["m"] + (1-config["beta1"])*dw
-    mt = config["m"] / (1-config["beta1"]**config["t"])
-    config["v"] = config["beta2"]*config["v"] + (1-config["beta2"])*(dw**2)
-    vt = config["v"] / (1-config["beta2"]**config["t"])
-    next_w = w - config["learning_rate"] * mt / (np.sqrt(vt) + config["epsilon"])
+#     config["t"] += 1 # 1 to inf
+#     config["m"] = config["beta1"]*config["m"] + (1-config["beta1"])*dw
+#     mt = config["m"] / (1-config["beta1"]**config["t"])
+#     config["v"] = config["beta2"]*config["v"] + (1-config["beta2"])*(dw**2)
+#     vt = config["v"] / (1-config["beta2"]**config["t"])
+#     next_w = w - config["learning_rate"] * mt / (np.sqrt(vt) + config["epsilon"])
+
+    eps, learning_rate = config['epsilon'], config['learning_rate']
+    beta1, beta2 = config['beta1'], config['beta2']
+    m, v, t = config['m'], config['v'], config['t']
+    # Adam
+    t = t + 1
+    m = beta1 * m + (1 - beta1) * dw          # momentum
+    mt = m / (1 - beta1**t)                   # bias correction
+    v = beta2 * v + (1 - beta2) * (dw * dw)   # RMSprop
+    vt = v / (1 - beta2**t)                   # bias correction
+    next_w = w - learning_rate * mt / (np.sqrt(vt) + eps)
+    # update values
+    config['m'], config['v'], config['t'] = m, v, t
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****

@@ -252,15 +252,12 @@ class FullyConnectedNet(object):
         for i in range(self.num_layers):
             self.params['W'+str(i+1)] = np.random.normal(0,weight_scale,(layers_dims[i],layers_dims[i+1]))
             self.params['b'+str(i+1)] = np.zeros(layers_dims[i+1])
-        
-#         self.params['W1'] = np.random.normal(0,weight_scale,(input_dim,hidden_dims[0]))
-#         self.params['b1'] = np.zeros((hidden_dims[0],))
-        
-#         self.params['W2'] = np.random.normal(0,weight_scale,(hidden_dims[0],hidden_dims[1]))
-#         self.params['b2'] = np.zeros((hidden_dims[1],))
-        
-#         self.params['W3'] = np.random.normal(0,weight_scale,(hidden_dims[1],num_classes))
-#         self.params['b3'] = np.zeros((num_classes,))        
+
+        if self.normalization != None:
+            # batch/layer norm parameters
+            for i in range(self.num_layers-1):
+                self.params['gamma'+str(i+1)] = np.ones(layers_dims[i+1])
+                self.params['beta' +str(i+1)] = np.zeros(layers_dims[i+1])
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -322,13 +319,35 @@ class FullyConnectedNet(object):
         # layer, etc.                                                              #
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+#         x = X
+#         caches = []
+#         gamma, beta, bn_params = None, None, None
+#         for i in range(self.num_layers-1):
+#             w = self.params['W'+str(i+1)]
+#             b = self.params['b'+str(i+1)]
+#             if self.normalization != None:
+#                 gamma = self.params['gamma'+str(i+1)]
+#                 beta = self.params['beta'+str(i+1)]
+#                 bn_params = self.bn_params[i]
+#             x, cache =  affine_norm_relu_forward(x, w, b, gamma, beta, bn_param, self.normalization)
+#             caches.append(cache)
+#         w = self.params['W'+str(self.num_layers)]
+#         b = self.params['b'+str(self.num_layers)]
+#         scores, cache = affine_forward(x,w,b)
+#         caches.append(cache)
+
         x = X
         caches = []
         gamma, beta, bn_params = None, None, None
         for i in range(self.num_layers-1):
             w = self.params['W'+str(i+1)]
             b = self.params['b'+str(i+1)]
-            x, cache =  affine_norm_relu_forward(x,w,b)
+            if self.normalization != None:
+                gamma = self.params['gamma'+str(i+1)]
+                beta  = self.params['beta'+str(i+1)]
+                bn_params = self.bn_params[i]
+            x, cache = affine_norm_relu_forward(x,w,b, gamma, beta, bn_params, self.normalization, 
+                                                self.use_dropout, self.dropout_param)
             caches.append(cache)
         w = self.params['W'+str(self.num_layers)]
         b = self.params['b'+str(self.num_layers)]
@@ -373,7 +392,11 @@ class FullyConnectedNet(object):
         grads['b' + str(self.num_layers)] = db
         
         for i in range(self.num_layers - 2, -1, -1):
-            dx, dw, db = affine_norm_relu_backward(dout, caches[i])
+            dx, dw, db, dgamma, dbeta = affine_norm_relu_backward(dout, caches[i], self.normalization,
+                                                                 self.use_dropout)
+            if self.normalization != None:
+                grads['gamma'+str(i+1)] = dgamma
+                grads['beta' +str(i+1)] = dbeta
             grads['W' + str(i + 1)] = dw + self.reg * self.params['W' + str(i + 1)]
             grads['b' + str(i + 1)] = db
             dout = dx
@@ -387,17 +410,30 @@ class FullyConnectedNet(object):
         return loss, grads
     
 # helper layer: affine - batch/layer norm - relu - dropout
-def affine_norm_relu_forward(x, w, b):
+def affine_norm_relu_forward(x, w, b, gamma, beta, bn_param, normalization, dropout, do_param):
+    bn_cache, dp_cache = None, None
     # affine layer
-    out, fc_cache = affine_forward(x,w,b)    
+    out, fc_cache = affine_forward(x,w,b)
+    # batchnorm layer
+    if normalization == 'batchnorm':
+        out, bn_cache = batchnorm_forward(out, gamma, beta, bn_param)
     # relu
     out, relu_cache = relu_forward(out)
-    return out, (fc_cache, relu_cache)
+    # dropout
+    if dropout:
+        out, dp_cache = dropout_forward(out, do_param)
+    return out, (fc_cache, bn_cache, relu_cache, dp_cache)
 
-def affine_norm_relu_backward(dout, cache,):
-    fc_cache, relu_cache = cache
+def affine_norm_relu_backward(dout, cache, normalization, dropout):
+    dgamma, dbeta = None, None
+    fc_cache, bn_cache, relu_cache, dp_cache = cache
+    # dropout
+    if dropout:
+        dout = dropout_backward(dout, dp_cache)
     # relu
     dout = relu_backward(dout, relu_cache)
+    if normalization == 'batchnorm':
+        dout, dgamma, dbeta = batchnorm_backward(dout, bn_cache)   
     # affine layer
     dx, dw, db = affine_backward(dout, fc_cache)
-    return dx, dw, db
+    return dx, dw, db, dgamma, dbeta
