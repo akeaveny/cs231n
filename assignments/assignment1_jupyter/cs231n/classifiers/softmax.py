@@ -32,9 +32,53 @@ def softmax_loss_naive(W, X, y, reg):
     # regularization!                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
-    pass
-
+#   W: 3073 x 10
+#   X: 500 x 3073
+#   y: 500
+    # compute the loss and the gradient
+#     num_classes = W.shape[1]
+#     num_train = X.shape[0]
+#     loss = 0.0
+#     for i in range(num_train):
+#         f = X[i].dot(W)
+#         # shifting values to zero
+#         f -= np.max(f)
+#         p = np.exp(f)/np.exp(f).sum()
+#         # loss
+#         loss -= np.log(p).sum()
+#         count = 0
+#         for j in range(num_classes):
+#             if j == y[i]: 
+#                 # dW: 10 x 1 
+#                 dW[i,j] = p[y[i]]*(1-p[y[i]])
+#             else:
+#                 dW[i,j] = -p[y[i]]*p[j]
+#     pass
+#     loss /= num_classes
+    
+#     compute the loss and the gradient
+    num_classes = W.shape[1]
+    num_train = X.shape[0]
+    loss = 0.0
+    for i in range(num_train):
+        f = X[i].dot(W)
+        # shifting values to zero
+        f -= np.max(f)
+        p_exp = np.exp(f)
+        num = p_exp[y[i]]
+        demon = p_exp.sum()
+        loss_i = -np.log(num/demon)
+        loss += loss_i
+        for j in range(num_classes):
+            if j == y[i]: 
+                # dW: 10 x 1 
+                dW[:,y[i]] -= (demon-num)/demon*X[i]
+            dW[:,j] += (p_exp[j])/demon*X[i]
+    loss /= num_train
+    loss += reg*np.sum(W*W)
+    dW /= num_train
+    dW += 2*reg*W
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     return loss, dW
@@ -57,8 +101,24 @@ def softmax_loss_vectorized(W, X, y, reg):
     # regularization!                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    num_classes = W.shape[1]
+    num_train = X.shape[0]
+    f = X.dot(W)
+    f -= np.max(f)
+    p_exp = np.exp(f)
+    num = p_exp[np.arange(num_train), y].reshape(num_train,1)
+    demon = np.sum(p_exp, axis=1).reshape(num_train,1)
+    loss = -np.log(num/demon).sum()
+    loss /= num_train
+    loss += reg*np.sum(W*W)
     pass
+    # Compute gradient
+    # Subtract in correct class
+    softmax_matrix = p_exp/p_exp.sum(axis=1, keepdims=True)
+    softmax_matrix[np.arange(num_train),y] -= 1
+    dW = X.T.dot(softmax_matrix)
+    dW /= num_train
+    dW += 2*reg*W
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 

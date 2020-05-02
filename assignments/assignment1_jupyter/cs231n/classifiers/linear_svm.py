@@ -30,20 +30,27 @@ def svm_loss_naive(W, X, y, reg):
     for i in range(num_train):
         scores = X[i].dot(W)
         correct_class_score = scores[y[i]]
+        count = 0
         for j in range(num_classes):
-            if j == y[i]:
+            if j == y[i]:         
                 continue
             margin = scores[j] - correct_class_score + 1 # note delta = 1
             if margin > 0:
                 loss += margin
+                # for j != y[i]
+                dW[:,j] += X[i]
+                # else we count the number of instances
+                count += 1
+        dW[:, y[i]] += -(count)*X[i]
 
     # Right now the loss is a sum over all training examples, but we want it
     # to be an average instead so we divide by num_train.
     loss /= num_train
-
+    dW /= num_train
     # Add regularization to the loss.
     loss += reg * np.sum(W * W)
-
+    # derrivative of W^2
+    dW += 2*reg*W
     #############################################################################
     # TODO:                                                                     #
     # Compute the gradient of the loss function and store it dW.                #
@@ -53,7 +60,7 @@ def svm_loss_naive(W, X, y, reg):
     # code above to compute the gradient.                                       #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -70,6 +77,7 @@ def svm_loss_vectorized(W, X, y, reg):
     """
     loss = 0.0
     dW = np.zeros(W.shape) # initialize the gradient as zero
+    num_train = X.shape[0]
 
     #############################################################################
     # TODO:                                                                     #
@@ -77,8 +85,34 @@ def svm_loss_vectorized(W, X, y, reg):
     # result in loss.                                                           #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+    # W: 10 x 3073
+    # X: 3073 x 500
+    # y: 500 x 1
+    
+#     delta = 1.0
+#     scores = X.dot(W)
+# #     print(scores.shape)
+#     # scores: 10 x 500
+#     N=X.shape[0] # 500
+#     z=np.arange(N)
+#     correct_class_scores = np.choose(y, scores.T)
+# #     print(correct_class_scores.shape)
+#     # 500 x 1 boradcasting
+#     margins = scores - correct_class_scores.reshape(correct_class_scores.shape[0],1) + delta
+#     margins[margins<=0] = 0
+#     loss = (np.sum(margins) - num_train)/num_train + reg * np.sum(W * W)
 
-    pass
+    num_classes = W.shape[1]
+    num_train = X.shape[0]
+    scores = X.dot(W)
+    correct_class_scores = scores[ np.arange(num_train), y].reshape(num_train,1)
+    margin = np.maximum(0, scores - correct_class_scores + 1)
+    margin[ np.arange(num_train), y] = 0 # do not consider correct class in loss
+    loss = margin.sum() / num_train
+
+    # Add regularization to the loss.
+    loss += reg * np.sum(W * W)
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -92,7 +126,25 @@ def svm_loss_vectorized(W, X, y, reg):
     # loss.                                                                     #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+#     mask = np.zeros(margins.shape)
+#     # case 1: y != j and margin > 0
+#     mask[margins>0] = 1
+#     # case 2: y[i] = j
+#     count = np.sum(mask, axis=1)
+#     mask[range(num_train), y] = -count
+#     # mask: 500 x 10
+#     dW = np.dot(X.T, mask)/num_train + 2*reg*W
 
+    # Compute gradient
+    margin[margin > 0] = 1
+    valid_margin_count = margin.sum(axis=1)
+    # Subtract in correct class (-s_y)
+    margin[np.arange(num_train),y ] -= valid_margin_count
+    dW = (X.T).dot(margin) / num_train
+
+    # Regularization gradient
+    dW = dW + reg * 2 * W
+    
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
