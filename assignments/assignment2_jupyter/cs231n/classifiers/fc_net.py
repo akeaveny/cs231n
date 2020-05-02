@@ -97,14 +97,14 @@ class TwoLayerNet(object):
         W2, b2 = self.params['W2'], self.params['b2']
         reg = self.reg
         N = X.shape[0]
-#         print("X: ", X.shape)
-#         print("W1: ", self.params['W1'].shape)
-#         print("b1: ", self.params['b1'].shape)
+        print("X: ", X.shape)
+        print("W1: ", self.params['W1'].shape)
+        print("b1: ", self.params['b1'].shape)
        
         hidden_layer = np.maximum(0, np.dot(X, W1) + b1)
-#         print("Hidden: ", hidden_layer.shape)
-#         print("W2: ", self.params['W2'].shape)
-#         print("b2: ",self.params['b2'].shape)
+        print("Hidden: ", hidden_layer.shape)
+        print("W2: ", self.params['W2'].shape)
+        print("b2: ",self.params['b2'].shape)
         scores = np.dot(hidden_layer, W2) + b2
 #         print(scores)
         pass
